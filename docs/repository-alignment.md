@@ -70,7 +70,7 @@ Keep image names, supported platforms, secrets, runtime permissions, licenses, a
 ### Docker Hub cleanup
 
 - Do not remove the legacy Docker Hub image until its exact repository and tag are confirmed and any remaining consumer or Unraid template has been moved to GHCR.
-- The earlier message said `ACE v3`; it may have meant AMP v3. No Docker Hub package has been deleted.
+- The exact Docker Hub repository and tag for the legacy AMP 3 image still need confirmation. No package has been deleted.
 
 ## Retired automation repository
 

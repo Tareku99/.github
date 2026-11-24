@@ -1,0 +1,159 @@
+name: Docker image release
+description: Build a single-platform image, optionally smoke-test it, and publish that same image to the owner's GHCR namespace.
+
+inputs:
+  image:
+    description: Lowercase GHCR image name, such as ghcr.io/tareku99/anilist-mal-sync
+    required: true
+  source_image:
+    description: Local image tag produced by this action before any publish tagging
+    required: true
+  context:
+    description: Docker build context
+    required: false
+    default: .
+  dockerfile:
+    description: Dockerfile path relative to the workspace
+    required: false
+    default: Dockerfile
+  platforms:
+    description: One target platform. A single platform is required so the tested local image can be pushed unchanged.
+    required: false
+    default: linux/amd64
+  build_args:
+    description: Newline-separated Docker build arguments in KEY=VALUE form
+    required: false
+    default: ""
+  cache_scope:
+    description: Optional BuildKit cache scope. Defaults to a repository-specific scope.
+    required: false
+    default: ""
+  smoke_test_script:
+    description: Optional caller-repository script that receives the local image name as its first argument
+    required: false
+    default: ""
+  publish:
+    description: Whether to tag and push the tested image to GHCR
+    required: false
+    default: "false"
+  tags:
+    description: Newline-separated GHCR tag names, required when publish is true
+    required: false
+    default: ""
+  token:
+    description: "GITHUB_TOKEN with packages: write, passed only by the publishing job"
+    required: false
+    default: ""
+
+outputs:
+  digest:
+    description: Digest reported by GHCR after the image push
+    value: ${{ steps.publish.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate release inputs
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        SOURCE_IMAGE: ${{ inputs.source_image }}
+        PLATFORMS: ${{ inputs.platforms }}
+        PUBLISH: ${{ inputs.publish }}
+      run: |
+        set -euo pipefail
+        if [[ "$PUBLISH" != "true" && "$PUBLISH" != "false" ]]; then
+          echo "::error::publish must be true or false."
+          exit 1
+        fi
+        if [[ "$PLATFORMS" == *,* ]]; then
+          echo "::error::This action loads and tests one local image. Supply exactly one platform."
+          exit 1
+        fi
+        if [[ -z "$IMAGE" || -z "$SOURCE_IMAGE" ]]; then
+          echo "::error::image and source_image are required."
+          exit 1
+        fi
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+
+    - name: Build image
+      id: build
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        platforms: ${{ inputs.platforms }}
+        build-args: ${{ inputs.build_args }}
+        load: true
+        tags: ${{ inputs.source_image }}
+        cache-from: type=gha,scope=${{ inputs.cache_scope || github.repository }}
+        cache-to: type=gha,mode=max,scope=${{ inputs.cache_scope || github.repository }}
+        provenance: false
+
+    - name: Run image smoke test
+      id: smoke
+      if: inputs.smoke_test_script != ''
+      shell: bash
+      env:
+        SMOKE_TEST_SCRIPT: ${{ inputs.smoke_test_script }}
+        SOURCE_IMAGE: ${{ inputs.source_image }}
+      run: |
+        set -euo pipefail
+        if [[ ! -f "$SMOKE_TEST_SCRIPT" ]]; then
+          echo "::error::Smoke-test script does not exist: $SMOKE_TEST_SCRIPT"
+          exit 1
+        fi
+        bash "$SMOKE_TEST_SCRIPT" "$SOURCE_IMAGE"
+
+    - name: Publish tested image to GHCR
+      id: publish
+      if: inputs.publish == 'true'
+      shell: bash
+      env:
+        GHCR_IMAGE: ${{ inputs.image }}
+        GHCR_SOURCE_IMAGE: ${{ inputs.source_image }}
+        GHCR_TAGS: ${{ inputs.tags }}
+        GHCR_TOKEN: ${{ inputs.token }}
+        GITHUB_ACTOR: ${{ github.actor }}
+        GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+      run: bash "${{ github.action_path }}/publish.sh"
+
+    - name: Add Docker release summary
+      if: always()
+      shell: bash
+      env:
+        BUILD_OUTCOME: ${{ steps.build.outcome }}
+        SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+        PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+        GHCR_IMAGE: ${{ inputs.image }}
+        GHCR_TAGS: ${{ inputs.tags }}
+        GHCR_DIGEST: ${{ steps.publish.outputs.digest }}
+        PUBLISH_REQUESTED: ${{ inputs.publish }}
+      run: |
+        {
+          printf '## Docker image build and publish\n\n'
+          printf '| Item | Result |\n| --- | --- |\n'
+          printf '| Build | %s |\n' "${BUILD_OUTCOME:-not run}"
+          printf '| Smoke test | %s |\n' "${SMOKE_OUTCOME:-not run}"
+          printf '| Publish | %s |\n' "${PUBLISH_OUTCOME:-not requested}"
+          printf '| Image | `%s` |\n' "$GHCR_IMAGE"
+          printf '| Event | %s |\n' "$GITHUB_EVENT_NAME"
+          printf '| Workflow ref | %s |\n' "${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          commit="$(git rev-parse HEAD 2>/dev/null || printf '%s' "$GITHUB_SHA")"
+          printf '| Commit | [`%s`](%s/%s/commit/%s) |\n' "${commit:0:7}" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$commit"
+          if [[ "$PUBLISH_REQUESTED" == "true" ]]; then
+            printf '| Digest | `%s` |\n' "${GHCR_DIGEST:-unavailable}"
+            printf '\n### Requested tags\n\n'
+            if [[ -n "$GHCR_TAGS" ]]; then
+              while IFS= read -r tag; do
+                [[ -z "$tag" ]] || printf -- '- `%s`\n' "$tag"
+              done <<< "$GHCR_TAGS"
+            else
+              printf '%s\n' '- None supplied.'
+            fi
+          else
+            printf '\nThe image was built for validation and was not published.\n'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"

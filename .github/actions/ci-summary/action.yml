@@ -1,0 +1,38 @@
+name: CI summary
+description: Format a test result or a workflow report on the Actions run summary.
+inputs:
+  test-outcome:
+    description: Test step outcome for a test report
+    default: ""
+  junit:
+    description: Optional JUnit XML file in the caller workspace
+    default: ""
+  jobs:
+    description: JSON object from the needs context for a workflow report
+    default: ""
+  source-sha:
+    description: Exact checked out commit, if available
+    default: ""
+  source-ref:
+    description: Source branch or tag for the report
+    default: ""
+  channel:
+    description: CI, production, or beta label for a workflow report
+    default: "CI"
+  image:
+    description: GHCR image name
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Write GitHub Actions summary
+      shell: bash
+      env:
+        SUMMARY_TEST: ${{ inputs.test-outcome }}
+        SUMMARY_JUNIT: ${{ inputs.junit }}
+        SUMMARY_JOBS: ${{ inputs.jobs }}
+        SUMMARY_SHA: ${{ inputs.source-sha }}
+        SUMMARY_REF: ${{ inputs.source-ref }}
+        SUMMARY_CHANNEL: ${{ inputs.channel }}
+        SUMMARY_IMAGE: ${{ inputs.image }}
+      run: python3 "$GITHUB_ACTION_PATH/summary.py"

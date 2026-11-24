@@ -1,2 +1,7 @@
-# .github
-Community defaults for repositories maintained by Tareku99
+# Tareku99 GitHub defaults and automation
+
+GitHub uses the community files here as defaults for repositories owned by Tareku99. Individual repositories can provide their own support policies and templates.
+
+- [Shared CI and Docker workflows](docs/shared-actions.md)
+- [Repository alignment plan](docs/repository-alignment.md)
+- [Support](SUPPORT.md) and [security reporting](SECURITY.md)

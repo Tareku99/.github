@@ -161,7 +161,7 @@ jobs:
 
       - name: Build, smoke-test, and publish the tested image
         id: image
-        uses: Tareku99/.github/.github/actions/docker-release@015c8694f07efa60a9215424ce85008ac1cc0bbd
+        uses: Tareku99/.github/.github/actions/docker-release@04dd88f13b5c0b4a07d66ddd6da00522509abb52
         with:
           image: ${{ inputs.image }}
           source_image: ${{ inputs.source_image }}

@@ -56,7 +56,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Build and smoke-test without publishing
-        uses: Tareku99/.github/.github/actions/docker-release@015c8694f07efa60a9215424ce85008ac1cc0bbd
+        uses: Tareku99/.github/.github/actions/docker-release@04dd88f13b5c0b4a07d66ddd6da00522509abb52
         with:
           image: ${{ inputs.image }}
           source_image: ${{ inputs.source_image }}

@@ -1,58 +1,82 @@
-# Repository alignment plan
+# Repository alignment tracker
+
+Status checked on 2026-11-24. This file records completed work and the remaining release gates across the six maintained repositories.
 
 ## Target layout
 
 | Repository | Owns | Distribution |
 | --- | --- | --- |
-| AMP-v3-dockerized | AMP image, panel smoke test, Linux runtime settings, and Unraid template | GHCR and Unraid |
-| anilist-mal-sync | Python sync service, OAuth setup, tests, Compose, and Unraid template | GHCR and Unraid; native Python development |
-| ACELink | Python service, prebuilt web UI, device setup, mock smoke test, and Compose | Linux Docker Compose first; native development and desktop hardware testing |
-| Tareku99/.github | Account-wide community defaults, reusable workflows, and actions | GitHub's native fallback and SHA-pinned Actions references |
+| AMP-v3-dockerized | AMP 3 image, panel smoke test, Linux runtime settings, Unraid template | GHCR and Unraid |
+| AniList-MAL-Sync | Python sync service, OAuth, tests, Compose, Unraid template | GHCR and Unraid; native Python development |
+| ACELink | Python service, prebuilt web UI, device setup, mock smoke test, Compose | Linux Docker Compose first; native development and hardware testing |
+| Tareku99/.github | Community defaults, reusable workflows, and composite actions | Shared files and SHA-pinned GitHub Actions references |
 
-Keep Docker image values, supported platforms, secrets, runtime permissions, licenses, and hardware requirements with the app that owns them.
+Keep image names, supported platforms, secrets, runtime permissions, licenses, and hardware requirements with the repository that owns the application.
 
-## 1. Document the current release flow
+## Completed
 
-- [ ] Describe production pushes, eligible version tags, and manual beta dispatch in the AMP and AniList READMEs.
-- [ ] Update AMP's production Compose example to pull GHCR. Keep local image builds available through an explicit override.
-- [ ] Update AniList's README to use Docker Compose v2, explain persistent data, and show how native Python runs the same CLI as the container.
-- [ ] Split ACELink's documented paths into Compose deployment and direct Python development. Mark the Compose image as local-build-only until the first GHCR release exists.
+### Community files and repository policy
 
-## 2. Prepare ACELink for Docker
+- Shared bug and feature issue forms, issue chooser, pull request template, support policy, security policy, funding link, and CODEOWNERS are present in Tareku99/.github.
+- The shared bug form asks for hardware model, adapter, and connection type when device issues are reported. The application repositories do not keep duplicate issue forms.
+- GitHub inherits these community files, but a personal account's .github repository cannot apply branch rulesets automatically. The equivalent ruleset was configured separately in each repository.
+- All six repositories use active default-branch rulesets. Pull requests and current required checks must pass; deletion and force pushes are blocked.
+- Merge commits are the only allowed PR merge method. Squash and rebase merges are disabled; the rulesets do not require linear history.
+- Required checks: .github `validate`; AMP, AniList, and ACELink `test` plus `build / build`; Snapmaker and Unraid driver `test`.
+- All six repositories have no collaborators, default Actions tokens are read-only, and workflows from external contributors require owner approval.
 
-- [ ] Build the frontend with the npm lockfile in a separate image stage. Ship Python, runtime dependencies, and built frontend assets in the final image.
-- [ ] Keep one runtime entry point and preserve mock mode. Use a writable data volume for the settings file; retain the native settings location.
-- [ ] Map only the serial adapter in Compose, with the device group available to the non-root container user. Keep the web UI on port 8765 by default.
-- [ ] Run the Python suite on PRs and use the shared Docker build workflow to smoke-test the UI and settings in mock mode.
-- [ ] On Linux, test ACE Pro and ACE 2 Pro on real adapters. Confirm detection or explicit serial configuration, device status, and settings after container recreation. Use a separate config copy for the first migration from a native install.
-- [ ] Verify arm64 on actual hardware or a suitable runner before advertising it. Begin with the tested architecture; add shared multi-platform publishing as a separate change.
-- [ ] After hardware checks, enable ACELink GHCR publishing through the shared workflows in Tareku99/.github. Publish beta first, verify pull and upgrade, then enable production tags and switch Compose to a published image.
-- [ ] Once the Docker path is proven, retire systemd and Scheduled Task installer automation if the native audience no longer needs it. Keep direct Python instructions for development and desktop hardware testing.
+### Shared CI and release workflows
 
-## 3. Centralize summaries
+- The shared CI summary action reports test outcomes and optional JUnit counts. The shared Docker build and publish workflows are pinned to full commit SHAs.
+- AMP and AniList report test, build, and publish outcomes, including image tags and digest. ACELink reports test and mock-container build results; its publish job is gated.
+- Snapmaker and Unraid driver CI report their single validation job.
+- The latest default-branch CI runs succeeded in all six repositories.
+- AMP README and Compose use GHCR. AniList README and Compose document Compose v2, persistent data, native Python development, beta releases, and production releases.
+- ACELink's Dockerfile uses a locked frontend build stage, a non-root Python runtime, and a writable `/data` settings volume. Compose maps only the configured serial device and device group. CI runs Python tests and a mock-mode container smoke test.
 
-- [ ] Build one shared test report action. Accept an outcome and optional JUnit XML. Show counts when available, and report missing or invalid reports without obscuring the real test result.
-- [ ] Add a shared final report job that reads test, build, and publish results. Include source commit, ref, release channel, status, and reported image tags and digest when applicable.
-- [ ] Run the final report on test failure and skipped publishing. Keep the summary separate from required merge checks.
-- [ ] Roll out reporting first, then consolidate repeated checkout, branch validation, source commit capture, and job dependencies where doing so preserves the release permission boundary.
-- [ ] Verify the required check names and sources before updating any ruleset. Verify PR, production, and manual beta behavior after adoption.
+### Production image snapshot
 
-## 4. Align contribution files and repository rules
+| Image | Verified production digest | Status |
+| --- | --- | --- |
+| `ghcr.io/tareku99/amp-v3-dockerized:latest` | `sha256:3990edbdae81aed83075c8d337af79f5c2cec53ea0b1a4991e14a28d3f23d18a` | Published by successful `master` run 45499055800 |
+| `ghcr.io/tareku99/anilist-mal-sync:latest` | `sha256:9a6d0b42ab26bffda043c2596fb6fb639f9e1088283456c8b283a307be49293f` | Published by successful `main` run 45499052597 |
+| `ghcr.io/tareku99/acelink` | None | No image has been published |
 
-- [ ] Draft one bug report, feature request, issue chooser config, and default PR template. Include ACELink hardware details where they help diagnose a report.
-- [ ] Merge the shared defaults PR in [Tareku99/.github](https://github.com/Tareku99/.github) before the app PRs retire duplicates.
-- [ ] Preserve useful AniList template fields. Migrate its issue forms and chooser together if switching to native inheritance.
-- [ ] Compare funding links and shared support policies before deduplicating them. Keep app-specific support routing and ownership local.
-- [ ] Document the ruleset baseline and audit it repo by repo. Verify that an open PR can rerun checks, failed checks block merge, and ordinary branch pushes do not publish.
+## Open follow-up PRs
 
-## Release verification and rollback
+- [Tareku99/.github#3](https://github.com/Tareku99/.github/pull/3) adds the shared source-checkout action and validates inherited issue forms. Its required `validate` check is green.
+- [AMP-v3-dockerized#5](https://github.com/Tareku99/AMP-v3-dockerized/pull/5) and [AniList-MAL-Sync#11](https://github.com/Tareku99/AniList-MAL-Sync/pull/11) use the pinned shared source-checkout action. Their required checks are green.
+- [ACELink#7](https://github.com/Tareku99/ACELink/pull/7) adds beta and production GHCR paths behind separate repository variables, both unset by default. Its test and mock-build checks are green.
+- Merge .github#3 before the three caller PRs so the shared action is available on the default branch. These PRs have not been merged.
 
-- Merge and verify one app at a time. Compare the image's registry digest with the publish log and confirm that a beta run does not move the production tag.
-- For an app documentation change that triggers a production build, wait for the publish result before treating the new image as released.
-- Record the previous known-good image digest before rollout. Restore it if a new image fails, retaining the existing data volume. Restore the previous workflow pin through a follow-up PR when a shared workflow regresses.
+## Remaining work
 
-## Retire the previous automation repository
+### ACELink real-device validation
 
-- Land the reusable workflows in this repository, then merge each caller change after its checks pass.
-- Verify the AMP and AniList production releases and the supported manual beta path from their default branches. Check ACELink's tests and mock container build.
-- Audit live workflow references and any maintained release branches before deleting the old repository. Historical reruns that pin the old repository will require it to remain available. Record the last working image digests before retirement.
+- The release workflow and README changes are in ACELink#7, but publishing stays disabled until ACE Pro and ACE 2 Pro adapters pass through the Linux container.
+- Validate real device detection or explicit serial configuration, live status in the UI, settings persistence after container recreation, and migration using a copy of a native settings file.
+- After validation, enable beta publishing first, verify pulling and upgrading the beta image, then enable production publishing. Keep `linux/amd64` as the only advertised platform until arm64 is tested.
+- Keep the Compose example on local builds until the first published image has been pulled and upgraded successfully.
+
+### AMP Unraid runtime
+
+- Valheim installation and startup were confirmed on Unraid with AMP's permission fallback. Recreate the container while retaining the data volume, then verify panel startup and a game-server restart against the current GHCR image.
+
+### Release-path checks
+
+- PR workflows have passed; the latest default-branch production workflows for AMP and AniList passed and published the digests above.
+- The manual beta path has not been exercised during this follow-up because it changes the public beta tag. Exercise it when a beta release is requested and verify that production tags remain unchanged.
+
+### Docker Hub cleanup
+
+- Do not remove the legacy Docker Hub image until its exact repository and tag are confirmed and any remaining consumer or Unraid template has been moved to GHCR.
+- The exact Docker Hub repository and tag for the legacy AMP 3 image still need confirmation. No package has been deleted.
+
+## Retired automation repository
+
+- `Tareku99/shared-devops` currently returns 404, and no active branch or release workflow in the six repositories references it.
+- Historical workflow runs that pinned `shared-devops` may not be rerunnable now that the repository is unavailable.
+
+## Rollback
+
+- Retain the previous known-good image digest and persistent data before rollout. If an update fails, restore the known-good image while keeping the data volume. If a shared workflow regresses, pin the caller back to its previous SHA in a follow-up PR.

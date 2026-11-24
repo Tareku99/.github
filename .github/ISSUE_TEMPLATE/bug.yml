@@ -1,0 +1,22 @@
+name: Bug report
+description: Report an issue you can reproduce.
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Include what you expected and how to reproduce the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the project version or image tag, host OS, architecture, and install method. For device issues include the hardware model, adapter, and connection type.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or configuration
+      description: Include only relevant details and remove credentials, tokens, and private information.

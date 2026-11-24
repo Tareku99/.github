@@ -1,0 +1,69 @@
+name: Shared Docker build
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: Lowercase GHCR image path under ghcr.io/tareku99
+        type: string
+        required: true
+      source_image:
+        description: Local tag for the image built during validation
+        type: string
+        required: true
+      context:
+        description: Docker build context
+        type: string
+        required: false
+        default: .
+      dockerfile:
+        description: Dockerfile path
+        type: string
+        required: false
+        default: Dockerfile
+      platforms:
+        description: Single target platform
+        type: string
+        required: false
+        default: linux/amd64
+      build_args:
+        description: Newline-separated Docker build arguments
+        type: string
+        required: false
+        default: ""
+      cache_scope:
+        description: Optional repository-specific BuildKit cache scope
+        type: string
+        required: false
+        default: ""
+      smoke_test_script:
+        description: Optional caller-repository smoke test script
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out caller repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Build and smoke-test without publishing
+        uses: Tareku99/.github/.github/actions/docker-release@015c8694f07efa60a9215424ce85008ac1cc0bbd
+        with:
+          image: ${{ inputs.image }}
+          source_image: ${{ inputs.source_image }}
+          context: ${{ inputs.context }}
+          dockerfile: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          build_args: ${{ inputs.build_args }}
+          cache_scope: ${{ inputs.cache_scope }}
+          smoke_test_script: ${{ inputs.smoke_test_script }}
+          publish: "false"

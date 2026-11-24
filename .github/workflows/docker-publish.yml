@@ -1,0 +1,176 @@
+name: Shared Docker publish
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: Lowercase GHCR image path under ghcr.io/tareku99
+        type: string
+        required: true
+      source_image:
+        description: Local tag for the image built before publishing
+        type: string
+        required: true
+      source_sha:
+        description: Exact application commit that passed tests
+        type: string
+        required: true
+      beta_branch:
+        description: Source branch for a manual beta release
+        type: string
+        default: ""
+      platform_tag_suffix:
+        description: Optional compatibility suffix, such as amd64
+        type: string
+        default: ""
+      include_sha_tag:
+        description: Preserve the production sha tag
+        type: boolean
+        default: false
+      context:
+        description: Docker build context
+        type: string
+        required: false
+        default: .
+      dockerfile:
+        description: Dockerfile path
+        type: string
+        required: false
+        default: Dockerfile
+      platforms:
+        description: Single target platform
+        type: string
+        required: false
+        default: linux/amd64
+      build_args:
+        description: Newline-separated Docker build arguments
+        type: string
+        required: false
+        default: ""
+      cache_scope:
+        description: Optional repository-specific BuildKit cache scope
+        type: string
+        required: false
+        default: ""
+      smoke_test_script:
+        description: Optional caller-repository smoke test script
+        type: string
+        required: false
+        default: ""
+    outputs:
+      tags:
+        description: Tags confirmed by a successful publish job
+        value: ${{ jobs.publish.outputs.tags }}
+      digest:
+        description: Digest reported by GHCR
+        value: ${{ jobs.publish.outputs.digest }}
+    secrets:
+      ghcr_token:
+        description: "GITHUB_TOKEN with packages: write for the caller's GHCR package"
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: publish
+    if: >-
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
+      (github.event_name == 'push' &&
+       (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
+        startsWith(github.ref, 'refs/tags/v')))
+    concurrency:
+      group: ghcr-${{ github.event_name == 'workflow_dispatch' && 'beta' || 'production' }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    outputs:
+      tags: ${{ steps.release.outputs.tags }}
+      digest: ${{ steps.image.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out beta smoke test from the release workflow branch
+        if: github.event_name == 'workflow_dispatch' && inputs.smoke_test_script != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Move beta smoke test outside the Docker context
+        if: github.event_name == 'workflow_dispatch' && inputs.smoke_test_script != ''
+        id: smoke
+        shell: bash
+        env:
+          SMOKE_SCRIPT: ${{ inputs.smoke_test_script }}
+        run: |
+          set -euo pipefail
+          script="$(mktemp "$RUNNER_TEMP/docker-smoke.XXXXXX")"
+          cp -- "$SMOKE_SCRIPT" "$script"
+          printf 'path=%s\n' "$script" >> "$GITHUB_OUTPUT"
+
+      - name: Check out tested source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: ${{ github.ref_type == 'tag' && '0' || '1' }}
+          persist-credentials: false
+
+      - name: Prepare release tags
+        id: release
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BETA_BRANCH: ${{ inputs.beta_branch }}
+          PLATFORM_SUFFIX: ${{ inputs.platform_tag_suffix }}
+          INCLUDE_SHA_TAG: ${{ inputs.include_sha_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            tags=("beta-${SOURCE_SHA:0:12}" beta)
+          else
+            if [[ "$GITHUB_REF_TYPE" == tag ]] &&
+               ! git merge-base --is-ancestor "$SOURCE_SHA" "refs/remotes/origin/$DEFAULT_BRANCH"; then
+              echo "::error::Production tags must point to a commit on the default branch."
+              exit 1
+            fi
+            tags=("$GITHUB_REF_NAME")
+            if [[ -n "$PLATFORM_SUFFIX" ]]; then
+              tags+=("$GITHUB_REF_NAME-$PLATFORM_SUFFIX")
+            fi
+            if [[ "$INCLUDE_SHA_TAG" == true ]]; then
+              tags+=("sha-${SOURCE_SHA:0:7}")
+            fi
+            tags+=(latest)
+          fi
+          {
+            printf 'tags<<EOF\n'
+            printf '%s\n' "${tags[@]}"
+            printf 'EOF\n'
+          } >> "$GITHUB_OUTPUT"
+          {
+            printf '## Release source\n\n'
+            printf -- '- Ref: %s\n' "${BETA_BRANCH:-$GITHUB_REF_NAME}"
+            printf -- '- Tested commit: [%s](%s/%s/commit/%s)\n' "${SOURCE_SHA:0:12}" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$SOURCE_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build, smoke-test, and publish the tested image
+        id: image
+        uses: Tareku99/.github/.github/actions/docker-release@015c8694f07efa60a9215424ce85008ac1cc0bbd
+        with:
+          image: ${{ inputs.image }}
+          source_image: ${{ inputs.source_image }}
+          context: ${{ inputs.context }}
+          dockerfile: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          build_args: ${{ inputs.build_args }}
+          cache_scope: ${{ inputs.cache_scope }}
+          smoke_test_script: ${{ steps.smoke.outputs.path || inputs.smoke_test_script }}
+          publish: "true"
+          tags: ${{ steps.release.outputs.tags }}
+          token: ${{ secrets.ghcr_token }}

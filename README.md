@@ -1,3 +1,7 @@
-# Community defaults
+# Tareku99 GitHub defaults and automation
 
-GitHub uses these files as defaults for repositories owned by Tareku99. Individual repos can provide their own policies. Reusable build and release workflows live in [shared-devops](https://github.com/Tareku99/shared-devops).
+GitHub uses the community files here as defaults for repositories owned by Tareku99. Individual repositories can provide their own support policies and templates.
+
+- [Shared CI and Docker workflows](docs/shared-actions.md)
+- [Repository alignment plan](docs/repository-alignment.md)
+- [Support](SUPPORT.md) and [security reporting](SECURITY.md)

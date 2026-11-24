@@ -1,83 +1,140 @@
-# Repository alignment tracker
+# Repository and Release Plan
 
-Status checked on 2026-11-24. This file records completed work and the remaining release gates across the six maintained repositories.
+Status checked on 2026-11-24. This is the single plan for the six repositories in this project: what is already in place, what remains, and what must be true before an image is published or removed.
 
-## Target layout
+## Goal
 
-| Repository | Owns | Distribution |
+- Keep shared community files and reusable CI in `Tareku99/.github`.
+- Keep each application's code, Docker settings, release tags, and deployment guidance in its own repository.
+- Build and test images on pull requests without publishing them. Publish only from approved release events.
+- Keep each default branch protected with the same merge and workflow controls.
+
+## Repositories and current state
+
+| Repository | Current state | Distribution / next gate |
 | --- | --- | --- |
-| AMP-v3-dockerized | AMP 3 image, panel smoke test, Linux runtime settings, Unraid template | GHCR and Unraid |
-| AniList-MAL-Sync | Python sync service, OAuth, tests, Compose, Unraid template | GHCR and Unraid; native Python development |
-| ACELink | Python service, prebuilt web UI, device setup, mock smoke test, Compose | Linux Docker Compose first; native development and hardware testing |
-| Tareku99/.github | Community defaults, reusable workflows, and composite actions | Shared files and SHA-pinned GitHub Actions references |
+| `Tareku99/.github` | Shared issue forms, support/security files, reusable Docker workflows, CI summary, source-checkout action, and validation are merged. | Source of shared files and SHA-pinned Actions references. Rulesets remain configured separately in each repo. |
+| `Tareku99/AMP-v3-dockerized` | Production image is published to GHCR; release and checkout workflows are merged. | GHCR and Unraid. Verify the post-merge image on Unraid with data retained. |
+| `Tareku99/AniList-MAL-Sync` | Production image is published to GHCR; release and checkout workflows are merged. | GHCR and Unraid. Manual beta release path has not been exercised. |
+| `Tareku99/ACELink` | Dockerfile, mock smoke test, release workflow, and settings migration instructions are merged. Publishing is gated and no image exists yet. | Linux Docker first. Test ACE Pro and ACE 2 Pro hardware before publishing. |
+| `Tareku99/snapmaker_u1_obico` | Shared community setup and CI are merged; CI is green. | Source repository; no image publishing is planned here. |
+| `Tareku99/unraid-nct6687-driver` | Shared community setup and CI are merged; CI is green. | Unraid plugin repository; no image publishing is planned here. |
 
-Keep image names, supported platforms, secrets, runtime permissions, licenses, and hardware requirements with the repository that owns the application.
+## Completed work
 
-## Completed
+### Shared community and contribution files
 
-### Community files and repository policy
+- `Tareku99/.github` provides the default bug form, feature form, issue chooser, pull request template, support policy, security policy, and funding link.
+- The bug form asks for hardware model, adapter, and connection type where relevant. The app repositories have no duplicate issue forms.
+- The `.github` repository has a `CODEOWNERS` file for itself. GitHub does not inherit that file into other repositories; all six repositories are owner-only with no collaborators.
+- AMP keeps one `LICENSE` file using the MIT license. No duplicate upstream license file is needed; upstream attribution remains in the project materials.
 
-- Shared bug and feature issue forms, issue chooser, pull request template, support policy, security policy, funding link, and CODEOWNERS are present in Tareku99/.github.
-- The shared bug form asks for hardware model, adapter, and connection type when device issues are reported. The application repositories do not keep duplicate issue forms.
-- GitHub inherits these community files, but a personal account's .github repository cannot apply branch rulesets automatically. The equivalent ruleset was configured separately in each repository.
-- All six repositories use active default-branch rulesets. Pull requests and current required checks must pass; deletion and force pushes are blocked.
-- Merge commits are the only allowed PR merge method. Squash and rebase merges are disabled; the rulesets do not require linear history.
-- Required checks: .github `validate`; AMP, AniList, and ACELink `test` plus `build / build`; Snapmaker and Unraid driver `test`.
-- All six repositories have no collaborators, default Actions tokens are read-only, and workflows from external contributors require owner approval.
+### Shared CI and Docker release code
 
-### Shared CI and release workflows
+- `Tareku99/.github` contains the shared checkout action, CI summary action, Docker build workflow, Docker publish workflow, and validation workflow.
+- Shared Actions references use full commit SHAs.
+- AMP, AniList, and ACELink use shared Docker build/publish workflows. Pull request builds run tests and image checks but skip publishing.
+- Snapmaker and the Unraid driver use the shared CI summary action for their validation checks.
+- The shared issue forms and the checkout action are validated by the `.github` workflow.
 
-- The shared CI summary action reports test outcomes and optional JUnit counts. The shared Docker build and publish workflows are pinned to full commit SHAs.
-- AMP and AniList report test, build, and publish outcomes, including image tags and digest. ACELink reports test and mock-container build results; its publish job is gated.
-- Snapmaker and Unraid driver CI report their single validation job.
-- The latest default-branch CI runs succeeded in all six repositories.
-- AMP README and Compose use GHCR. AniList README and Compose document Compose v2, persistent data, native Python development, beta releases, and production releases.
-- ACELink's Dockerfile uses a locked frontend build stage, a non-root Python runtime, and a writable `/data` settings volume. Compose maps only the configured serial device and device group. CI runs Python tests and a mock-mode container smoke test.
+### Branch and workflow protections
 
-### Production image snapshot
+- All six repositories have active default-branch rulesets. Pull requests and required status checks are required; deletion and force pushes are blocked.
+- The only allowed PR merge method is GitHub's merge-commit method. Squash and rebase merging are disabled. The rulesets do not require linear history.
+- Required checks: `.github` `validate`; AMP, AniList, and ACELink `test` plus `build / build`; Snapmaker and Unraid driver `test`.
+- All six repositories have zero collaborators, Actions' default token permissions are read-only, and workflows from external contributors require owner approval.
+- A personal account's `.github` repository cannot apply branch rulesets automatically. The same ruleset was configured per repository.
+- The four implementation PRs were merged as two-parent merge commits, not squashed. Keep PR branches free of merge commits from merging the base branch into them.
 
-| Image | Verified production digest | Status |
+### Current image and CI evidence
+
+| Repository | Latest verified run | Result |
 | --- | --- | --- |
-| `ghcr.io/tareku99/amp-v3-dockerized:latest` | `sha256:346d1d55c5d6296e244e2611bb6979c5ed7725f3b5f8f03f5060f1b70199af42` | Published by successful post-merge `master` run [45510141918](https://github.com/Tareku99/AMP-v3-dockerized/actions/runs/45510141918) |
-| `ghcr.io/tareku99/anilist-mal-sync:latest` | `sha256:9a6d0b42ab26bffda043c2596fb6fb639f9e1088283456c8b283a307be49293f` | Published by successful post-merge `main` run [45510164666](https://github.com/Tareku99/anilist-mal-sync/actions/runs/45510164666) |
-| `ghcr.io/tareku99/acelink` | None | No image has been published |
+| `.github` | [45509961578](https://github.com/Tareku99/.github/actions/runs/45509961578) | `validate` passed |
+| AMP | [45510141918](https://github.com/Tareku99/AMP-v3-dockerized/actions/runs/45510141918) | Tests and production publish passed |
+| AniList | [45510164666](https://github.com/Tareku99/anilist-mal-sync/actions/runs/45510164666) | Tests and production publish passed |
+| ACELink | [45510177073](https://github.com/Tareku99/ACELink/actions/runs/45510177073) | Tests passed; publish skipped by its hardware gate |
+| Snapmaker | [45502535188](https://github.com/Tareku99/snapmaker_u1_obico/actions/runs/45502535188) | CI passed |
+| Unraid driver | [45502531499](https://github.com/Tareku99/unraid-nct6687-driver/actions/runs/45502531499) | CI passed |
 
-## Merged follow-up PRs
+| Published image | Current verified tags | Digest |
+| --- | --- | --- |
+| `ghcr.io/tareku99/amp-v3-dockerized` | `master`, `master-amd64`, `latest` | `sha256:346d1d55c5d6296e244e2611bb6979c5ed7725f3b5f8f03f5060f1b70199af42` |
+| `ghcr.io/tareku99/anilist-mal-sync` | `main`, `sha-7095e46`, `latest` | `sha256:9a6d0b42ab26bffda043c2596fb6fb639f9e1088283456c8b283a307be49293f` |
+| `ghcr.io/tareku99/acelink` | No tags | No image published; publishing remains disabled |
 
-- [.github#3](https://github.com/Tareku99/.github/pull/3) added the shared source-checkout action and inherited issue-form validation. Post-merge `validate` run [45509961578](https://github.com/Tareku99/.github/actions/runs/45509961578) passed.
-- [AMP#5](https://github.com/Tareku99/AMP-v3-dockerized/pull/5) and [AniList#11](https://github.com/Tareku99/AniList-MAL-Sync/pull/11) now use the pinned shared source-checkout action. Their post-merge production runs passed and published the digests above.
-- [ACELink#7](https://github.com/Tareku99/ACELink/pull/7) added gated GHCR release paths and native settings migration steps. Post-merge checks passed; publishing was skipped because the hardware gate remains off.
-- All four PRs were merged using merge commits; squash merging was not used.
+Both released images target the platforms configured in their workflows. ACELink currently targets `linux/amd64`; do not advertise arm64 until it is tested.
 
-## Remaining work
+## Remaining work, in order
 
-### ACELink real-device validation
+### 1. Verify AMP on Unraid
 
-- ACELink#7 is merged, but publishing stays disabled until ACE Pro and ACE 2 Pro adapters pass through the Linux container.
-- Validate real device detection or explicit serial configuration, live status in the UI, settings persistence after container recreation, and migration using a copy of a native settings file.
-- After validation, enable beta publishing first, verify pulling and upgrading the beta image, then enable production publishing. Keep `linux/amd64` as the only advertised platform until arm64 is tested.
-- Keep the Compose example on local builds until the first published image has been pulled and upgraded successfully.
+**Status:** The current Unraid template points to GHCR. Valheim installation and startup were previously confirmed, but the post-merge image still needs recreation and restart testing on the user's Unraid host.
 
-### AMP Unraid runtime
+- Confirm the container's Repository field is `ghcr.io/tareku99/amp-v3-dockerized:latest`.
+- Back up or otherwise preserve the existing AMP data mapping. Recreate the container using the current image without changing the data path or required runtime settings.
+- Verify the panel starts, a game server starts and restarts, and AMP reports no shard-agent or `.docker-machine-id` permission error.
+- Record the image digest used and keep the previous known-good digest available for rollback.
 
-- Valheim installation and startup were confirmed on Unraid with AMP's permission fallback. Recreate the container while retaining the data volume, then verify panel startup and a game-server restart against the current GHCR image.
+**Done when:** the current GHCR image survives container recreation with the existing data and a game-server restart succeeds.
 
-### Release-path checks
+### 2. Test ACELink on real hardware
 
-- Post-merge production workflows for AMP and AniList passed and published the digests above. The default-branch ACELink workflow passed its tests; its publish job was skipped by the hardware gate.
-- The rulesets require the configured status checks, and PR builds did not publish images. I did not create a deliberately failing PR to demonstrate the merge-block UI.
-- The manual beta path has not been exercised during this follow-up because it changes the public beta tag. Exercise it when a beta release is requested and verify that production tags remain unchanged.
+**Status:** Not done. The mock-mode container and Python tests pass, but neither real serial adapter has been validated through Docker.
 
-### Docker Hub cleanup
+- On a Linux Docker host, test an ACE Pro and an ACE 2 Pro separately with their real serial adapters.
+- Confirm the configured device path and device group are mapped into the non-root container, and verify device detection or explicit serial selection plus live device status in the UI.
+- Use a separate copy of the native settings file for the first migration. Follow the copy instructions in the ACELink README; verify the UI reads the settings and that edits survive restart and container recreation.
+- Record the adapter type, model, device path behavior, settings result, and any errors for each unit.
 
-- The current Unraid template uses GHCR, but existing Docker Hub installations require a manual image-field change. Keep the legacy image until its exact repository/tag is confirmed and any active installs that need it have switched.
-- The exact Docker Hub repository and tag for the legacy AMP 3 image still need confirmation. No package has been deleted.
+**Done when:** both models are usable in the Linux container and settings survive container recreation. Do not enable ACELink publishing before this gate passes.
 
-## Retired automation repository
+### 3. Publish the first ACELink image
 
-- `Tareku99/shared-devops` was deleted and now returns 404. No active branch or release workflow in the six repositories references it.
-- Historical workflow runs that pinned `shared-devops` may not be rerunnable now that the repository is unavailable.
+**Status:** Workflow is merged; its beta and production repository variables are unset, so no image can publish.
+
+- After step 2 passes, set `ACELINK_BETA_PUBLISH_ENABLED=true` and dispatch the workflow from `main`, selecting the tested source branch.
+- Verify the beta tag and digest, pull the image, test startup and settings persistence, and verify an upgrade from the prior beta.
+- Only after beta verification, set `ACELINK_PRODUCTION_PUBLISH_ENABLED=true`. Verify the production tags and digest.
+- Then change `compose.yaml` from local build to `ghcr.io/tareku99/acelink:latest`, and verify a clean pull and upgrade.
+- Keep `linux/amd64` as the advertised platform until arm64 is tested.
+
+**Done when:** a beta pull/upgrade succeeds, production tags point to the tested image, and Compose uses the published image.
+
+### 4. Exercise the AMP and AniList beta paths
+
+**Status:** Production releases passed. The manual beta workflow has not been run.
+
+- When a beta release is intentionally requested, dispatch the workflow from its default branch and select the tested source branch.
+- Confirm the commit-specific beta tag and `beta` tag identify the expected image digest.
+- Confirm `latest` and the normal production tag do not move.
+
+**Done when:** the beta image is pullable and production tags remain unchanged. This creates public beta tags, so run it only as an intentional release.
+
+### 5. Decide when to remove the old Docker Hub image
+
+**Status:** Not deleted. The exact legacy Docker Hub repository/tag has not been confirmed.
+
+- Current AMP Compose and Unraid template use GHCR. Existing Docker Hub installations still need a manual Repository-field change to GHCR.
+- Confirm the exact Docker Hub image name and tag, verify the user's Unraid container has switched to GHCR, and identify any other active installs that still need the Hub image.
+- Keep the old image until known installs are migrated. Then either leave it with a deprecation notice or delete it if legacy pulls and updates are no longer needed.
+
+**Decision:** Do not delete the Docker Hub image yet. Removing it can break pulls or updates for installations still configured to use it.
+
+### 6. Optional end-to-end ruleset failure check
+
+**Status:** Ruleset configuration and passing PR checks are verified. No deliberately failing PR was created to demonstrate the merge-block UI.
+
+- If explicit proof is needed, use a temporary branch and harmless failing required check. Confirm GitHub blocks merge until the check passes and that the check can be rerun; then close the PR without merging.
+- Ordinary PR image builds already showed publish jobs skipped. Do not test failure behavior on a production branch.
+
+## Retired repository and retained tooling
+
+- `Tareku99/shared-devops` was deleted by the owner. No active branch or release workflow references it. Historical workflow runs that pinned it may no longer be rerunnable.
+- Keep ACELink's native installer scripts while they support desktop use and hardware testing. Revisit their removal only if the native audience no longer needs them.
 
 ## Rollback
 
-- Retain the previous known-good image digest and persistent data before rollout. If an update fails, restore the known-good image while keeping the data volume. If a shared workflow regresses, pin the caller back to its previous SHA in a follow-up PR.
+- Record the previous known-good image digest before each rollout.
+- If an image fails, restore the previous digest and keep the existing data volume.
+- If a shared workflow regresses, pin its caller back to the previous full SHA in a follow-up PR.

@@ -65,11 +65,12 @@ Keep image names, supported platforms, secrets, runtime permissions, licenses, a
 ### Release-path checks
 
 - Post-merge production workflows for AMP and AniList passed and published the digests above. The default-branch ACELink workflow passed its tests; its publish job was skipped by the hardware gate.
+- The rulesets require the configured status checks, and PR builds did not publish images. I did not create a deliberately failing PR to demonstrate the merge-block UI.
 - The manual beta path has not been exercised during this follow-up because it changes the public beta tag. Exercise it when a beta release is requested and verify that production tags remain unchanged.
 
 ### Docker Hub cleanup
 
-- Do not remove the legacy Docker Hub image until its exact repository and tag are confirmed and any remaining consumer or Unraid template has been moved to GHCR.
+- The current Unraid template uses GHCR, but existing Docker Hub installations require a manual image-field change. Keep the legacy image until its exact repository/tag is confirmed and any active installs that need it have switched.
 - The exact Docker Hub repository and tag for the legacy AMP 3 image still need confirmation. No package has been deleted.
 
 ## Retired automation repository

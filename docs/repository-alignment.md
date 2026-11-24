@@ -38,22 +38,22 @@ Keep image names, supported platforms, secrets, runtime permissions, licenses, a
 
 | Image | Verified production digest | Status |
 | --- | --- | --- |
-| `ghcr.io/tareku99/amp-v3-dockerized:latest` | `sha256:3990edbdae81aed83075c8d337af79f5c2cec53ea0b1a4991e14a28d3f23d18a` | Published by successful `master` run 45499055800 |
-| `ghcr.io/tareku99/anilist-mal-sync:latest` | `sha256:9a6d0b42ab26bffda043c2596fb6fb639f9e1088283456c8b283a307be49293f` | Published by successful `main` run 45499052597 |
+| `ghcr.io/tareku99/amp-v3-dockerized:latest` | `sha256:346d1d55c5d6296e244e2611bb6979c5ed7725f3b5f8f03f5060f1b70199af42` | Published by successful post-merge `master` run [45510141918](https://github.com/Tareku99/AMP-v3-dockerized/actions/runs/45510141918) |
+| `ghcr.io/tareku99/anilist-mal-sync:latest` | `sha256:9a6d0b42ab26bffda043c2596fb6fb639f9e1088283456c8b283a307be49293f` | Published by successful post-merge `main` run [45510164666](https://github.com/Tareku99/anilist-mal-sync/actions/runs/45510164666) |
 | `ghcr.io/tareku99/acelink` | None | No image has been published |
 
-## Open follow-up PRs
+## Merged follow-up PRs
 
-- [Tareku99/.github#3](https://github.com/Tareku99/.github/pull/3) adds the shared source-checkout action and validates inherited issue forms. Its required `validate` check is green.
-- [AMP-v3-dockerized#5](https://github.com/Tareku99/AMP-v3-dockerized/pull/5) and [AniList-MAL-Sync#11](https://github.com/Tareku99/AniList-MAL-Sync/pull/11) use the pinned shared source-checkout action. Their required checks are green.
-- [ACELink#7](https://github.com/Tareku99/ACELink/pull/7) adds beta and production GHCR paths behind separate repository variables, both unset by default. Its test and mock-build checks are green.
-- Merge .github#3 before the three caller PRs so the shared action is available on the default branch. These PRs have not been merged.
+- [.github#3](https://github.com/Tareku99/.github/pull/3) added the shared source-checkout action and inherited issue-form validation. Post-merge `validate` run [45509961578](https://github.com/Tareku99/.github/actions/runs/45509961578) passed.
+- [AMP#5](https://github.com/Tareku99/AMP-v3-dockerized/pull/5) and [AniList#11](https://github.com/Tareku99/AniList-MAL-Sync/pull/11) now use the pinned shared source-checkout action. Their post-merge production runs passed and published the digests above.
+- [ACELink#7](https://github.com/Tareku99/ACELink/pull/7) added gated GHCR release paths and native settings migration steps. Post-merge checks passed; publishing was skipped because the hardware gate remains off.
+- All four PRs were merged using merge commits; squash merging was not used.
 
 ## Remaining work
 
 ### ACELink real-device validation
 
-- The release workflow and README changes are in ACELink#7, but publishing stays disabled until ACE Pro and ACE 2 Pro adapters pass through the Linux container.
+- ACELink#7 is merged, but publishing stays disabled until ACE Pro and ACE 2 Pro adapters pass through the Linux container.
 - Validate real device detection or explicit serial configuration, live status in the UI, settings persistence after container recreation, and migration using a copy of a native settings file.
 - After validation, enable beta publishing first, verify pulling and upgrading the beta image, then enable production publishing. Keep `linux/amd64` as the only advertised platform until arm64 is tested.
 - Keep the Compose example on local builds until the first published image has been pulled and upgraded successfully.
@@ -64,7 +64,7 @@ Keep image names, supported platforms, secrets, runtime permissions, licenses, a
 
 ### Release-path checks
 
-- PR workflows have passed; the latest default-branch production workflows for AMP and AniList passed and published the digests above.
+- Post-merge production workflows for AMP and AniList passed and published the digests above. The default-branch ACELink workflow passed its tests; its publish job was skipped by the hardware gate.
 - The manual beta path has not been exercised during this follow-up because it changes the public beta tag. Exercise it when a beta release is requested and verify that production tags remain unchanged.
 
 ### Docker Hub cleanup
@@ -74,7 +74,7 @@ Keep image names, supported platforms, secrets, runtime permissions, licenses, a
 
 ## Retired automation repository
 
-- `Tareku99/shared-devops` currently returns 404, and no active branch or release workflow in the six repositories references it.
+- `Tareku99/shared-devops` was deleted and now returns 404. No active branch or release workflow in the six repositories references it.
 - Historical workflow runs that pinned `shared-devops` may not be rerunnable now that the repository is unavailable.
 
 ## Rollback

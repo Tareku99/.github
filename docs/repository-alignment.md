@@ -19,6 +19,7 @@ Snapshot: 2026-11-24
 - The shared repository has pinned Docker build/publish actions and CI summaries, plus account-wide issue forms, support policies, funding, and pull request defaults.
 - ACELink has a non-root Linux image, Compose setup, Python tests, and a mock container smoke test. The current Compose path builds locally.
 - Snapmaker U1 Obico and Unraid NCT6687 adopted the shared community files and now require their CI check before merging.
+- All six repositories have zero collaborators, read-only default workflow-token permissions, and require owner approval for workflow runs from external contributors.
 - All six default-branch workflows passed on 2026-11-24. Current repository rules require pull requests, block force pushes/deletion, require up-to-date checks, and allow merge commits only. Required checks are listed below.
 
 ## Current merge checks

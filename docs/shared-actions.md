@@ -14,7 +14,9 @@ Application-specific tests stay in each application repository. The caller must 
 - Grant `contents: read` to the build workflow call. Grant `packages: write` only to the publishing workflow call.
 - Pass `GITHUB_TOKEN` only to the publishing workflow, after application tests pass.
 - Use a GHCR image path under `ghcr.io/tareku99/`.
-- Pass the exact `source_sha` checked out by the app test job. For beta, the app dispatches from its default branch and passes the selected branch as a `beta_branch` input. GHCR gets `beta-<commit>` and `beta`.
+- Pass the exact `source_sha` checked out by the app test job. For beta, add `workflow_dispatch` to the caller and select a branch in GitHub's **Run workflow** dropdown. Leave the checkout action's `branch` and the publish workflow's `beta_branch` inputs unset. The checked-out and tested SHA must match the dispatch SHA. GHCR gets `beta-<commit>` and `beta`.
+- GitHub runs the caller workflow defined on the selected branch. It must contain the updated caller and the pinned shared references. If a beta smoke-test script is configured, the publish job takes that script from the caller's default branch.
+- Existing callers can still dispatch from their default branch and pass the typed override to both shared components. This retains their current behavior until they switch to the dropdown.
 - Production publishes on default branch pushes and version tags on commits reachable from the default branch. The shared workflow sets `latest` plus the branch or version tag, with optional compatibility tags.
 - The workflow checks out the caller repository. The exact built image is smoke-tested and pushed from the same runner. One platform is supported per invocation; AMP 3 requires `linux/amd64`.
 

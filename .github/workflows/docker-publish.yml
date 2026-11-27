@@ -16,7 +16,7 @@ on:
         type: string
         required: true
       beta_branch:
-        description: Source branch for a manual beta release
+        description: Legacy beta branch override. Leave empty to publish the selected branch's dispatch commit.
         type: string
         default: ""
       platform_tag_suffix:
@@ -78,7 +78,9 @@ jobs:
     name: publish
     if: >-
       (github.event_name == 'workflow_dispatch' &&
-       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
+       startsWith(github.ref, 'refs/heads/') &&
+       (inputs.beta_branch == '' ||
+        github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) ||
       (github.event_name == 'push' &&
        (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
         startsWith(github.ref, 'refs/tags/v')))
@@ -93,11 +95,11 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Check out beta smoke test from the release workflow branch
+      - name: Check out beta smoke test from the default branch
         if: github.event_name == 'workflow_dispatch' && inputs.smoke_test_script != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.beta_branch != '' && github.sha || format('refs/heads/{0}', github.event.repository.default_branch) }}
           persist-credentials: false
 
       - name: Move beta smoke test outside the Docker context
@@ -132,6 +134,10 @@ jobs:
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
           if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            if [[ -z "$BETA_BRANCH" && "$SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+              echo "::error::The tested source must match the commit selected for the beta dispatch."
+              exit 1
+            fi
             tags=("beta-${SOURCE_SHA:0:12}" beta)
           else
             if [[ "$GITHUB_REF_TYPE" == tag ]] &&

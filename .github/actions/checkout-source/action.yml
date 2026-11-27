@@ -2,11 +2,11 @@ name: Checkout application source
 description: Validate and check out the tested source commit, including manually selected beta branches.
 inputs:
   branch:
-    description: Source branch for a manual beta run. Leave empty for the triggering commit.
+    description: Legacy source branch override for a beta run dispatched from the default branch. Leave empty to use the triggering commit.
     required: false
     default: ""
   default-branch:
-    description: Repository default branch used to restrict beta dispatches.
+    description: Repository default branch required when using the legacy branch override.
     required: true
 outputs:
   source-sha:
@@ -26,9 +26,13 @@ runs:
         BETA_BRANCH: ${{ inputs.branch }}
       run: |
         set -euo pipefail
-        if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+        if [[ "$EVENT_NAME" == "workflow_dispatch" && "$EVENT_REF" != refs/heads/* ]]; then
+          echo "::error::Select a branch for a beta release."
+          exit 1
+        fi
+        if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$BETA_BRANCH" ]]; then
           if [[ "$EVENT_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
-            echo "::error::Run this workflow from the default branch and enter the beta branch as an input."
+            echo "::error::The legacy beta branch override is only available from the default branch."
             exit 1
           fi
           git check-ref-format "refs/heads/$BETA_BRANCH"

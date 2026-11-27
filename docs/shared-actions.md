@@ -4,6 +4,7 @@ Use these reusable workflows from the caller repository:
 
 - `.github/workflows/docker-build.yml` builds the caller's Dockerfile and optionally runs its smoke-test script. It has `contents: read` only and never publishes.
 - `.github/workflows/docker-publish.yml` builds the image, runs the same optional smoke test, and publishes that tested image to GHCR. It requests `packages: write` only in the publishing job.
+- `.github/workflows/docker-version-tag.yml` is optional. After a successful default-branch publish, it reads the app's version and creates matching Git and GHCR tags when that version increases.
 - Both workflows use the pinned `.github/actions/docker-release` composite action for the build, smoke-test, publish, and summary steps.
 
 Application-specific tests stay in each application repository. The caller must make the reusable workflow depend on its test job so a failed test prevents the image workflow from starting.
@@ -69,6 +70,31 @@ jobs:
 ```
 
 For advanced cases, the composite action can still be called directly. Its action reference must also use a full commit SHA.
+
+### Automatic version tags
+
+Apps choose a version in a tracked JSON or TOML file. Raise the version in a regular PR to request a versioned release. A default-branch push with an unchanged version does not create a version tag. Versions must increase and use `MAJOR.MINOR.PATCH`.
+
+Call the version workflow after the app tests and the shared publish job succeed. It verifies the tested source is the default-branch push commit and tags the published digest without rebuilding. It creates the Git tag with the caller's job token, so it publishes the matching image tag in the same run instead of depending on another tag-triggered workflow.
+
+```yaml
+jobs:
+  version-tag:
+    needs: [test, publish]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      packages: write
+    uses: Tareku99/.github/.github/workflows/docker-version-tag.yml@<full-commit-sha>
+    with:
+      image: ghcr.io/tareku99/example
+      image_digest: ${{ needs.publish.outputs.digest }}
+      source_sha: ${{ needs.test.outputs.source_sha }}
+      version_file: pyproject.toml
+      version_key: project.version
+```
+
+For `package.json`, set `version_file: package.json` and use the default `version` key. Existing tags pointing to a different commit or digest are rejected. If the Git tag is created and registry tagging fails, rerun the failed job to reuse the original published digest.
 
 ## CI reports
 

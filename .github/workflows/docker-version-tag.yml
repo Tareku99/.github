@@ -1,0 +1,156 @@
+name: Shared Docker version tagging
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: GHCR image previously published by the caller
+        type: string
+        required: true
+      image_digest:
+        description: Digest returned by the successful shared publish job
+        type: string
+        required: true
+      source_sha:
+        description: Exact source commit tested and published by the caller
+        type: string
+        required: true
+      version_file:
+        description: Repository-relative JSON or TOML version file
+        type: string
+        required: true
+      version_key:
+        description: Dotted key containing the MAJOR.MINOR.PATCH version
+        type: string
+        default: version
+
+permissions: {}
+
+jobs:
+  tag:
+    name: Tag a version increase
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out tested commit and history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect a version increase
+        id: version
+        env:
+          BEFORE: ${{ github.event.before }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION_FILE: ${{ inputs.version_file }}
+          VERSION_KEY: ${{ inputs.version_key }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          from pathlib import PurePosixPath
+          import re
+          import subprocess
+          import tomllib
+
+          source = os.environ["SOURCE_SHA"]
+          if source != os.environ["GITHUB_SHA"]:
+              raise SystemExit("The published source must match the commit that triggered this run.")
+
+          path = PurePosixPath(os.environ["VERSION_FILE"])
+          if path.is_absolute() or ".." in path.parts or path.suffix not in {".json", ".toml"}:
+              raise SystemExit("version_file must be a repository-relative JSON or TOML path.")
+          parse = tomllib.loads if path.suffix == ".toml" else json.loads
+
+          def read_version(ref):
+              text = subprocess.check_output(["git", "show", f"{ref}:{path}"], encoding="utf-8")
+              value = parse(text)
+              for segment in os.environ["VERSION_KEY"].split("."):
+                  value = value[segment]
+              return value
+
+          previous = read_version(os.environ["BEFORE"])
+          current = read_version(source)
+          if current == previous:
+              print(f"Version {current} is unchanged.")
+              raise SystemExit(0)
+
+          def numeric_version(value):
+              if not isinstance(value, str) or not re.fullmatch(
+                  r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", value
+              ) or len(value) > 127:
+                  raise SystemExit("Automatic tagging requires a MAJOR.MINOR.PATCH version.")
+              return tuple(map(int, value.split(".")))
+
+          if numeric_version(current) <= numeric_version(previous):
+              raise SystemExit(f"Project version must increase: {previous} → {current}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              print(f"tag=v{current}", file=output)
+          PY
+
+      - name: Validate published image
+        if: steps.version.outputs.tag != ''
+        env:
+          IMAGE: ${{ inputs.image }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE" =~ ^ghcr\.io/tareku99/[a-z0-9]+([._/-][a-z0-9]+)*$ ||
+                ! "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::A published GHCR image under ghcr.io/tareku99 and its digest are required."
+            exit 1
+          fi
+
+      - name: Create or verify the Git version tag
+        if: steps.version.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if existing=$(git rev-parse --verify "refs/tags/$VERSION_TAG^{commit}" 2>/dev/null); then
+            if [[ "$existing" != "$SOURCE_SHA" ]]; then
+              echo "::error::$VERSION_TAG already points to a different commit."
+              exit 1
+            fi
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$VERSION_TAG" -f "sha=$SOURCE_SHA" --silent
+          fi
+
+      - name: Tag the published image by digest
+        if: steps.version.outputs.tag != ''
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          IMAGE: ${{ inputs.image }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          VERSION_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          inspect_digest() {
+            docker buildx imagetools inspect "$IMAGE:$VERSION_TAG" --format '{{.Manifest.Digest}}'
+          }
+          if existing=$(inspect_digest 2>&1); then
+            if [[ "$existing" != "$IMAGE_DIGEST" ]]; then
+              echo "::error::$IMAGE:$VERSION_TAG already points to a different image."
+              exit 1
+            fi
+          elif [[ "$existing" == *"not found"* || "$existing" == *"manifest unknown"* ]]; then
+            docker buildx imagetools create --prefer-index=false \
+              --tag "$IMAGE:$VERSION_TAG" "$IMAGE@$IMAGE_DIGEST"
+          else
+            printf '%s\n' "$existing" >&2
+            exit 1
+          fi
+          [[ "$(inspect_digest)" == "$IMAGE_DIGEST" ]]
+          printf 'Published `%s:%s` at `%s`.\n' "$IMAGE" "$VERSION_TAG" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"

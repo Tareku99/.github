@@ -14,11 +14,21 @@ Application-specific tests stay in each application repository. The caller must 
 - Grant `contents: read` to the build workflow call. Grant `packages: write` only to the publishing workflow call.
 - Pass `GITHUB_TOKEN` only to the publishing workflow, after application tests pass.
 - Use a GHCR image path under `ghcr.io/tareku99/`.
-- Pass the exact `source_sha` checked out by the app test job. For beta, add `workflow_dispatch` to the caller and select a branch in GitHub's **Run workflow** dropdown. The checked-out and tested SHA must match the dispatch SHA. GHCR gets `beta-<commit>` and `beta`.
+- Pass the exact `source_sha` checked out by the app test job. The tested commit must match the commit that triggered the release.
 - GitHub runs the caller workflow defined on the selected branch. It must contain the updated caller and the pinned shared references. If a beta smoke-test script is configured, the publish job takes that script from the caller's default branch.
 - When updating from an older pin, remove the caller's typed branch dispatch input, the checkout action's `branch` and `default-branch` inputs, and the publish workflow's `beta_branch` input in the same change.
-- Production publishes on default branch pushes and version tags on commits reachable from the default branch. The shared workflow sets `latest` plus the branch or version tag, with optional compatibility tags.
 - The workflow checks out the caller repository. The exact built image is smoke-tested and pushed from the same runner. One platform is supported per invocation; AMP 3 requires `linux/amd64`.
+
+### Release triggers and image tags
+
+| Trigger | GHCR tags |
+| --- | --- |
+| Push or merge to the default branch | `latest` and the default branch name, with an optional `sha-<commit>` tag |
+| Manually select a non-default branch in **Run workflow** | `beta` and `beta-<commit>` |
+| Push a `v*` Git tag that points to a commit reachable from the default branch | The version tag, with an optional `sha-<commit>` tag |
+| Push to a non-default branch, or manually run on the default branch or a tag | No publish |
+
+Configure the caller with `workflow_dispatch` and push triggers for the default branch and `v*` tags. A version tag push does not move `latest`.
 
 Example validation call:
 

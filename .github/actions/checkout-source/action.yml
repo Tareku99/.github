@@ -1,13 +1,5 @@
 name: Checkout application source
 description: Validate and check out the tested source commit, including manually selected beta branches.
-inputs:
-  branch:
-    description: Source branch for a manual beta run. Leave empty for the triggering commit.
-    required: false
-    default: ""
-  default-branch:
-    description: Repository default branch used to restrict beta dispatches.
-    required: true
 outputs:
   source-sha:
     description: Exact application commit checked out by this action.
@@ -15,32 +7,20 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Resolve source ref
-      id: ref
+    - name: Require a non-default branch for manual beta runs
+      if: >-
+        github.event_name == 'workflow_dispatch' &&
+        (github.ref_type != 'branch' ||
+         github.ref_name == github.event.repository.default_branch)
       shell: bash
-      env:
-        EVENT_NAME: ${{ github.event_name }}
-        EVENT_REF: ${{ github.ref }}
-        EVENT_SHA: ${{ github.sha }}
-        DEFAULT_BRANCH: ${{ inputs.default-branch }}
-        BETA_BRANCH: ${{ inputs.branch }}
       run: |
-        set -euo pipefail
-        if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-          if [[ "$EVENT_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
-            echo "::error::Run this workflow from the default branch and enter the beta branch as an input."
-            exit 1
-          fi
-          git check-ref-format "refs/heads/$BETA_BRANCH"
-          printf 'ref=refs/heads/%s\n' "$BETA_BRANCH" >> "$GITHUB_OUTPUT"
-        else
-          printf 'ref=%s\n' "$EVENT_SHA" >> "$GITHUB_OUTPUT"
-        fi
+        echo "::error::Select a non-default branch for a beta release. The default branch publishes automatically on push."
+        exit 1
 
     - name: Check out application source
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: ${{ steps.ref.outputs.ref }}
+        ref: ${{ github.sha }}
         persist-credentials: false
 
     - name: Record source commit

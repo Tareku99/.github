@@ -15,10 +15,6 @@ on:
         description: Exact application commit that passed tests
         type: string
         required: true
-      beta_branch:
-        description: Source branch for a manual beta release
-        type: string
-        default: ""
       platform_tag_suffix:
         description: Optional compatibility suffix, such as amd64
         type: string
@@ -78,7 +74,8 @@ jobs:
     name: publish
     if: >-
       (github.event_name == 'workflow_dispatch' &&
-       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
+       github.ref_type == 'branch' &&
+       github.ref_name != github.event.repository.default_branch) ||
       (github.event_name == 'push' &&
        (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
         startsWith(github.ref, 'refs/tags/v')))
@@ -93,11 +90,11 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Check out beta smoke test from the release workflow branch
+      - name: Check out beta smoke test from the default branch
         if: github.event_name == 'workflow_dispatch' && inputs.smoke_test_script != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ format('refs/heads/{0}', github.event.repository.default_branch) }}
           persist-credentials: false
 
       - name: Move beta smoke test outside the Docker context
@@ -125,13 +122,16 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          BETA_BRANCH: ${{ inputs.beta_branch }}
           PLATFORM_SUFFIX: ${{ inputs.platform_tag_suffix }}
           INCLUDE_SHA_TAG: ${{ inputs.include_sha_tag }}
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
           if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            if [[ "$SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+              echo "::error::The tested source must match the commit selected for the beta dispatch."
+              exit 1
+            fi
             tags=("beta-${SOURCE_SHA:0:12}" beta)
           else
             if [[ "$GITHUB_REF_TYPE" == tag ]] &&
@@ -146,7 +146,9 @@ jobs:
             if [[ "$INCLUDE_SHA_TAG" == true ]]; then
               tags+=("sha-${SOURCE_SHA:0:7}")
             fi
-            tags+=(latest)
+            if [[ "$GITHUB_REF_TYPE" == branch ]]; then
+              tags+=(latest)
+            fi
           fi
           {
             printf 'tags<<EOF\n'
@@ -155,7 +157,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           {
             printf '## Release source\n\n'
-            printf -- '- Ref: %s\n' "${BETA_BRANCH:-$GITHUB_REF_NAME}"
+            printf -- '- Ref: %s\n' "$GITHUB_REF_NAME"
             printf -- '- Tested commit: [%s](%s/%s/commit/%s)\n' "${SOURCE_SHA:0:12}" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$SOURCE_SHA"
           } >> "$GITHUB_STEP_SUMMARY"
 

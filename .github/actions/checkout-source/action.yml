@@ -1,13 +1,5 @@
 name: Checkout application source
 description: Validate and check out the tested source commit, including manually selected beta branches.
-inputs:
-  branch:
-    description: Legacy source branch override for a beta run dispatched from the default branch. Leave empty to use the triggering commit.
-    required: false
-    default: ""
-  default-branch:
-    description: Repository default branch required when using the legacy branch override.
-    required: true
 outputs:
   source-sha:
     description: Exact application commit checked out by this action.
@@ -15,36 +7,17 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Resolve source ref
-      id: ref
+    - name: Require a branch for manual beta runs
+      if: github.event_name == 'workflow_dispatch' && github.ref_type != 'branch'
       shell: bash
-      env:
-        EVENT_NAME: ${{ github.event_name }}
-        EVENT_REF: ${{ github.ref }}
-        EVENT_SHA: ${{ github.sha }}
-        DEFAULT_BRANCH: ${{ inputs.default-branch }}
-        BETA_BRANCH: ${{ inputs.branch }}
       run: |
-        set -euo pipefail
-        if [[ "$EVENT_NAME" == "workflow_dispatch" && "$EVENT_REF" != refs/heads/* ]]; then
-          echo "::error::Select a branch for a beta release."
-          exit 1
-        fi
-        if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$BETA_BRANCH" ]]; then
-          if [[ "$EVENT_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
-            echo "::error::The legacy beta branch override is only available from the default branch."
-            exit 1
-          fi
-          git check-ref-format "refs/heads/$BETA_BRANCH"
-          printf 'ref=refs/heads/%s\n' "$BETA_BRANCH" >> "$GITHUB_OUTPUT"
-        else
-          printf 'ref=%s\n' "$EVENT_SHA" >> "$GITHUB_OUTPUT"
-        fi
+        echo "::error::Select a branch for a beta release."
+        exit 1
 
     - name: Check out application source
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: ${{ steps.ref.outputs.ref }}
+        ref: ${{ github.sha }}
         persist-credentials: false
 
     - name: Record source commit

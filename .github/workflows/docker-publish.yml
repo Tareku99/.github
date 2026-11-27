@@ -15,10 +15,6 @@ on:
         description: Exact application commit that passed tests
         type: string
         required: true
-      beta_branch:
-        description: Legacy beta branch override. Leave empty to publish the selected branch's dispatch commit.
-        type: string
-        default: ""
       platform_tag_suffix:
         description: Optional compatibility suffix, such as amd64
         type: string
@@ -78,9 +74,7 @@ jobs:
     name: publish
     if: >-
       (github.event_name == 'workflow_dispatch' &&
-       startsWith(github.ref, 'refs/heads/') &&
-       (inputs.beta_branch == '' ||
-        github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) ||
+       github.ref_type == 'branch') ||
       (github.event_name == 'push' &&
        (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
         startsWith(github.ref, 'refs/tags/v')))
@@ -99,7 +93,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.smoke_test_script != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ inputs.beta_branch != '' && github.sha || format('refs/heads/{0}', github.event.repository.default_branch) }}
+          ref: ${{ format('refs/heads/{0}', github.event.repository.default_branch) }}
           persist-credentials: false
 
       - name: Move beta smoke test outside the Docker context
@@ -127,14 +121,13 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          BETA_BRANCH: ${{ inputs.beta_branch }}
           PLATFORM_SUFFIX: ${{ inputs.platform_tag_suffix }}
           INCLUDE_SHA_TAG: ${{ inputs.include_sha_tag }}
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
           if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
-            if [[ -z "$BETA_BRANCH" && "$SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+            if [[ "$SOURCE_SHA" != "$GITHUB_SHA" ]]; then
               echo "::error::The tested source must match the commit selected for the beta dispatch."
               exit 1
             fi
@@ -161,7 +154,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           {
             printf '## Release source\n\n'
-            printf -- '- Ref: %s\n' "${BETA_BRANCH:-$GITHUB_REF_NAME}"
+            printf -- '- Ref: %s\n' "$GITHUB_REF_NAME"
             printf -- '- Tested commit: [%s](%s/%s/commit/%s)\n' "${SOURCE_SHA:0:12}" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$SOURCE_SHA"
           } >> "$GITHUB_STEP_SUMMARY"
 

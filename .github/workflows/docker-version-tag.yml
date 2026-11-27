@@ -153,4 +153,4 @@ jobs:
             exit 1
           fi
           [[ "$(inspect_digest)" == "$IMAGE_DIGEST" ]]
-          printf 'Published `%s:%s` at `%s`.\n' "$IMAGE" "$VERSION_TAG" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Published %s:%s at %s.\n' "$IMAGE" "$VERSION_TAG" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
